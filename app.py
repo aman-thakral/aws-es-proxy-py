@@ -1,7 +1,7 @@
 import config
 from urllib.parse import parse_qs, urlencode, quote
 from requests import session as requests_session
-from flask import Flask, Response, request
+from flask import Flask, Response, request, jsonify, current_app
 from aws_auth import AWSAuth
 
 app = Flask(__name__)
@@ -10,16 +10,26 @@ PROXY_REQ_HEADERS_WHITELIST = ["content-type"]
 PROXY_RESP_HEADERS_BLACKLIST = ["connection", "content-length",
                                 "content-encoding", "transfer-encoding"]
 
+CORS_HEADERS = 'X-Requested-With,X-Auth-Token,Content-Type,Content-Length,Authorization'
 
-@app.route("/", defaults={"path": ""})
-@app.route("/<path:path>", methods=["HEAD", "GET", "POST", "PUT", "DELETE"])
+@app.route("/", defaults={"path": ""}, methods=["GET", "OPTIONS"])
+@app.route("/<path:path>", methods=["HEAD", "OPTIONS", "GET", "POST", "PUT", "DELETE"])
 def elastic(path):
     proxy_request_headers = {"kbn-xsrf": "reporting"}
     requests_response = None
     response = Response()
     session = requests_session()
-    session.headers["Connection"] = "close"
+    origin = request.headers.get("Origin")
 
+    if config.enable_cors:
+        session.headers["Connection"] = "close"
+        session.headers['Access-Control-Allow-Headers'] = CORS_HEADERS
+        session.headers['Access-Control-Allow-Origin'] = origin
+    if request.method == "OPTIONS" and config.enable_cors:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Headers'] = CORS_HEADERS
+        response.headers['Access-Control-Allow-Method'] = 'OPTIONS,HEAD,GET,PUT,DELETE'
+        return response
     auth = AWSAuth(config.aws_credentials, config.aws_region)
     query_string = urlencode(
         parse_qs(request.query_string.decode("utf-8"), keep_blank_values=True),

@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 
 import app
 import config
@@ -13,6 +13,8 @@ def _get_args():
     required = parser.add_argument_group("required arguments")
     parser.add_argument("-r", "--region", metavar="\b", default="eu-west-1",
                         help="AWS service region. Default is 'eu-west-1'")
+    parser.add_argument('--profile', help="AWS profile name")
+    parser.add_argument('--enable-cors', action='store_true', help='Enable CORS headers')
     parser.add_argument("-lh", "--host", metavar="\b",
                         help="Local host to listen on. Default: 127.0.0.1",
                         default="127.0.0.1")
@@ -33,7 +35,7 @@ def main():
     logging.info("Proxy started")
 
     args = _get_args()
-    config.aws_credentials = session.Session().get_credentials()
+    config.aws_credentials = session.Session(region_name=args.region, profile_name=args.profile).get_credentials()
     access_key = environ.get("AWS_ACCESS_KEY_ID")
     secret_key = environ.get("AWS_SECRET_ACCESS_KEY")
 
@@ -43,7 +45,8 @@ def main():
     elif access_key and secret_key:
         config.aws_credentials = session.Session(
             aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key
+            aws_secret_access_key=secret_key,
+            region_name=args.region
         ).get_credentials()
         logging.info(
             "Successfully loaded AWS credentials from environment variables"
@@ -57,7 +60,7 @@ def main():
     config.app_port = args.port
     config.aws_region = args.region
     config.aws_endpoint = args.endpoint
-
+    config.enable_cors = args.enable_cors
     app.start()
 
 
